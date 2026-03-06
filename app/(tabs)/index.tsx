@@ -1,98 +1,139 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { router } from "expo-router";
+import React from "react";
+import { Image, ImageBackground, KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function LandingScreen() {
+	const colorScheme = useColorScheme();
+	const isDark = colorScheme === 'dark';
 
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+	const getThemeColor = (light: string, dark: string) => isDark ? dark : light;
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
-  );
+	return (
+		<View style={[styles.container, { backgroundColor: getThemeColor("#FFFFFF", "#1A1A1A") }]}>
+			<ImageBackground 
+				source={{uri: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/RoYkSihffo/30kjbnxc_expires_30_days.png"}} 
+				resizeMode={'stretch'}
+				style={styles.view}
+				>
+				<SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+					<KeyboardAvoidingView 
+						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+						style={styles.keyboardView}
+					>
+						<View style={styles.content}>
+							<View style={styles.column}>
+								<Image
+									source={{uri: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/RoYkSihffo/eofueq48_expires_30_days.png"}} 
+									resizeMode={"stretch"}
+									style={styles.image}
+								/>
+								<View style={styles.column2}>
+									<Text style={[styles.text, { color: getThemeColor("#FFFFFF", "#FFFFFF") }]}>
+										{"Let's Get Started"}
+									</Text>
+									<Text style={[styles.text2, { color: getThemeColor("#FFFFFF", "#E0E0E0") }]}>
+										{"Schedule your appointment in just a few taps."}
+									</Text>
+								</View>
+							</View>
+
+							<View style={styles.buttonContainer}>
+								<TouchableOpacity style={styles.button} onPress={() => router.push('/signup')}>
+									<Text style={styles.text3}>
+										{"Get Started"}
+									</Text>
+								</TouchableOpacity>
+								<TouchableOpacity style={styles.button2} onPress={() => router.push('/login')}>
+									<Text style={styles.text4}>
+										{"I'm already a member"}
+									</Text>
+								</TouchableOpacity>
+							</View>
+						</View>
+					</KeyboardAvoidingView>
+				</SafeAreaView>
+			</ImageBackground>
+		</View>
+	)
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
+	container: {
+		flex: 1,
+		backgroundColor: "#FFFFFF",
+	},
+	keyboardView: {
+		flex: 1,
+	},
+	safeArea: {
+		flex: 1,
+	},
+	content: {
+		flex: 1,
+		justifyContent: 'space-between',
+		paddingVertical: 20,
+		alignItems: 'center',
+	},
+	button: {
+		alignSelf: "stretch",
+		alignItems: "center",
+		backgroundColor: "#38B45D",
+		borderRadius: 12,
+		paddingVertical: 18,
+		marginHorizontal: 16,
+		marginBottom: 12,
+	},
+	button2: {
+		alignSelf: "stretch",
+		alignItems: "center",
+		borderColor: "#C7C5CC",
+		borderRadius: 12,
+		borderWidth: 1,
+		paddingVertical: 16,
+		marginHorizontal: 16,
+		marginBottom: 20,
+	},
+	column: {
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	column2: {
+		marginBottom: 30,
+		marginHorizontal: 35,
+	},
+	buttonContainer: {
+		alignSelf: "stretch",
+		marginHorizontal: 0,
+	},
+	image: {
+		width: 140,
+		height: 83,
+		marginBottom: 30,
+	},
+	text: {
+		color: "#FFFFFF",
+		fontSize: 32,
+		fontWeight: "bold",
+		textAlign: "center",
+		marginBottom: 12,
+	},
+	text2: {
+		color: "#FFFFFF",
+		fontSize: 14,
+		textAlign: "center",
+	},
+	text3: {
+		color: "#FFFFFF",
+		fontSize: 18,
+		fontWeight: "bold",
+	},
+	text4: {
+		color: "#FFFFFF",
+		fontSize: 16,
+		fontWeight: "500",
+	},
+	view: {
+		flex: 1,
+	},
 });
