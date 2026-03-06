@@ -1,11 +1,19 @@
-import * as Linking from 'expo-linking';
+import * as AuthSession from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useState } from "react";
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from "react-native";
 
-const BACKEND_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
-const GOOGLE_CALLBACK_PATH = 'login';
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '';
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? '';
+const EXPO_PROJECT_FULL_NAME = process.env.EXPO_PUBLIC_EXPO_PROJECT_FULL_NAME ?? '@usherponce/ashcolapp';
+const GOOGLE_REDIRECT_URI = `https://auth.expo.io/${
+	EXPO_PROJECT_FULL_NAME.startsWith('@') ? EXPO_PROJECT_FULL_NAME : `@${EXPO_PROJECT_FULL_NAME}`
+}`;
 
 export default function LoginScreen() {
 	const [email, setEmail] = useState('');
@@ -14,6 +22,20 @@ export default function LoginScreen() {
 	const [loading, setLoading] = useState(false);
 	const colorScheme = useColorScheme();
 	const isDark = colorScheme === 'dark';
+
+	const [request] = Google.useAuthRequest(
+		{
+			webClientId: GOOGLE_WEB_CLIENT_ID || undefined,
+			iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
+			androidClientId: GOOGLE_ANDROID_CLIENT_ID || undefined,
+			clientId: GOOGLE_WEB_CLIENT_ID || undefined,
+			responseType: AuthSession.ResponseType.Token,
+			scopes: ['openid', 'profile', 'email'],
+			selectAccount: true,
+			redirectUri: GOOGLE_REDIRECT_URI,
+		},
+		undefined
+	);
 
 	const getThemeColor = (light: string, dark: string) => isDark ? dark : light;
 
@@ -28,7 +50,7 @@ export default function LoginScreen() {
 		try {
 			// Placeholder flow: wire this to your backend auth endpoint next.
 			await new Promise((resolve) => setTimeout(resolve, 450));
-			router.replace('/');
+			router.replace('/(tabs)/explore');
 		} catch {
 			Alert.alert('Login Failed', 'Unable to sign in right now. Please try again.');
 		} finally {
@@ -36,56 +58,106 @@ export default function LoginScreen() {
 		}
 	};
 
-	const handleGoogleSignIn = async () => {
-		if (!BACKEND_BASE_URL) {
-			Alert.alert('Missing Setup', 'Set EXPO_PUBLIC_API_BASE_URL in your env before using Google login.');
+	const finishGoogleSignIn = async (authResult: AuthSession.AuthSessionResult) => {
+		if (authResult.type === 'cancel' || authResult.type === 'dismiss') {
+			Alert.alert('Cancelled', 'Google sign-in was cancelled.');
 			return;
 		}
 
-		const callbackUrl = Linking.createURL(GOOGLE_CALLBACK_PATH);
-		const backendAuthUrl = `${BACKEND_BASE_URL.replace(/\/$/, '')}/auth/google/start?redirect_uri=${encodeURIComponent(callbackUrl)}`;
+		if (authResult.type !== 'success') {
+			if (authResult.type === 'error') {
+				const errorMessage =
+					authResult.error?.description ??
+					authResult.error?.message ??
+					authResult.params?.error_description ??
+					authResult.params?.error ??
+					'Google authorization failed. Please check your OAuth configuration.';
+
+				Alert.alert('Google Auth Error', errorMessage);
+				return;
+			}
+
+			Alert.alert('Login Failed', 'Google sign-in did not complete. Please try again.');
+			return;
+		}
+
+		const accessToken =
+			authResult.authentication?.accessToken ??
+			(typeof authResult.params?.access_token === 'string' ? authResult.params.access_token : null);
+		const idToken =
+			authResult.authentication?.idToken ??
+			(typeof authResult.params?.id_token === 'string' ? authResult.params.id_token : null);
+		const authCode = typeof authResult.params?.code === 'string' ? authResult.params.code : null;
+
+		if (!accessToken && !idToken && !authCode) {
+			Alert.alert('Login Failed', 'Google sign-in returned no usable auth data.');
+			return;
+		}
+
+		let displayName = 'there';
+		if (accessToken) {
+			try {
+				const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+					headers: {
+						Authorization: `Bearer ${accessToken}`,
+					},
+				});
+
+				if (profileResponse.ok) {
+					const profile = (await profileResponse.json()) as { name?: string; email?: string };
+					displayName = profile.name ?? profile.email ?? displayName;
+				}
+			} catch (profileError) {
+				console.warn('Google profile fetch skipped:', profileError);
+			}
+		}
+
+		Alert.alert('Success', `Welcome ${displayName}!`);
+		router.replace('/(tabs)/explore');
+	};
+
+	const handleGoogleSignIn = async () => {
+		if (!GOOGLE_WEB_CLIENT_ID && !GOOGLE_IOS_CLIENT_ID && !GOOGLE_ANDROID_CLIENT_ID) {
+			Alert.alert('Missing Setup', 'Set EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID in your env to use Google sign-in.');
+			return;
+		}
+
+		if (!request?.url) {
+			Alert.alert('Please Wait', 'Google sign-in is still initializing. Please try again in a moment.');
+			return;
+		}
+
+		const returnUrl = AuthSession.getDefaultReturnUrl();
+		const proxyStartUrl = `${GOOGLE_REDIRECT_URI}/start?${new URLSearchParams({
+			authUrl: request.url,
+			returnUrl,
+		}).toString()}`;
 
 		try {
 			setLoading(true);
-			const result = await WebBrowser.openAuthSessionAsync(backendAuthUrl, callbackUrl);
+			const browserResult = await WebBrowser.openAuthSessionAsync(proxyStartUrl, returnUrl);
 
-			if (result.type === 'cancel' || result.type === 'dismiss') {
+			if (browserResult.type === 'cancel' || browserResult.type === 'dismiss') {
 				Alert.alert('Cancelled', 'Google sign-in was cancelled.');
 				return;
 			}
 
-			if (result.type !== 'success' || !("url" in result)) {
+			if (browserResult.type !== 'success') {
 				Alert.alert('Login Failed', 'Google sign-in did not complete. Please try again.');
 				return;
 			}
 
-			const parsedUrl = Linking.parse(result.url);
-			const queryParams = parsedUrl.queryParams ?? {};
-			const backendError = typeof queryParams.error === 'string' ? queryParams.error : null;
-			const tokenFromBackend =
-				typeof queryParams.token === 'string'
-					? queryParams.token
-					: typeof queryParams.access_token === 'string'
-						? queryParams.access_token
-						: null;
-
-			if (backendError) {
-				Alert.alert('Login Failed', backendError);
-				return;
+			let parsedResult = request.parseReturnUrl(browserResult.url);
+			const nestedUrlMatch = browserResult.url.match(/[?&]url=([^&]+)/);
+			if (parsedResult.type === 'error' && nestedUrlMatch?.[1]) {
+				parsedResult = request.parseReturnUrl(decodeURIComponent(nestedUrlMatch[1]));
 			}
 
-			if (!tokenFromBackend) {
-				Alert.alert('Login Failed', 'No token returned from backend.');
-				return;
-			}
-
-			// TODO: Persist tokenFromBackend (SecureStore) and fetch user profile.
-			Alert.alert('Success', 'Google sign-in successful! Redirecting...');
-			await new Promise((resolve) => setTimeout(resolve, 500));
-			router.replace('/');
+			await finishGoogleSignIn(parsedResult);
 		} catch (error) {
-			console.error('Google Sign-In Error:', error);
-			Alert.alert('Error', 'Failed to sign in with Google. Please try again.');
+			console.error('Google Sign-In Prompt Error:', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown prompt error.';
+			Alert.alert('Error', `Could not start Google sign-in. ${errorMessage}`);
 		} finally {
 			setLoading(false);
 		}
